@@ -1,6 +1,6 @@
 [package]
 name = "sonicobject"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2018"
 description = "A wrapper for sonic_serde_object"
 license-file = "LICENSE"
@@ -13,9 +13,10 @@ homepage = "https://github.com/sonicrules1234/sonicobject"
 
 
 [dependencies]
-serde_json = "1.0.64"
 serde = { version = "1.0.126", features = ["derive"] }
-acid-store = { version = "0.8.0", features = ["store-directory"] }
+#acid-store = { version = "0.8.0", features = ["store-directory"] }
 thiserror = "1.0.28"
 rmp-serde = "0.15.5"
-sonic_serde_object = "0.1.1"
+sonic_serde_object = "0.2.4"
+
+[features]

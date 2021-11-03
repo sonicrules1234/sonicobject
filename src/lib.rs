@@ -1,12 +1,13 @@
-use acid_store::repo::Commit;
+//use acid_store::repo::Commit;
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 //use serde_json::Value;
 //use std::ops::{Index, IndexMut};
-use acid_store::repo::{OpenOptions, value::ValueRepo, OpenMode};
-use acid_store::store::{DirectoryConfig};
+//use acid_store::repo::{OpenOptions, value::ValueRepo, OpenMode};
+//use acid_store::store::{DirectoryConfig};
 use thiserror::Error;
 use std::fmt;
+use std::io::{Read, Write};
 //use json_value_merge::Merge;
 use sonic_serde_object::SonicSerdeObject;
 #[derive(Serialize, Eq, PartialEq, Deserialize, Debug, Clone)]
@@ -16,7 +17,8 @@ pub struct SonicObject {
     spot: usize
 }
 pub struct SonicPersistObject {
-    pub tree: ValueRepo<String>,
+    pub tree: SonicSerdeObject,
+    pub filepath: PathBuf,
 }
 #[derive(Debug, Error)]
 pub enum SonicObjectError {
@@ -244,6 +246,59 @@ impl Iterator for SonicObject {
         }
     }
 }
+
+impl SonicPersistObject {
+    pub fn new(filep: impl Into<PathBuf>) -> Self {
+        let filepath = filep.into();
+        let tree: SonicSerdeObject;
+        if filepath.exists() {
+            let mut file_obj = std::fs::File::open(filepath.clone()).unwrap();
+            let mut buf: Vec<u8> = Vec::new();
+            file_obj.read_to_end(&mut buf).unwrap();
+            tree = rmp_serde::decode::from_slice(&buf).unwrap()
+        } else {
+            tree = SonicSerdeObject::new_map();
+        }
+        //let tree = OpenOptions::new().mode(OpenMode::Create).open(&DirectoryConfig{ path: filepath }).unwrap();//sled::open(&filepath).unwrap();
+        Self {
+            tree: tree,
+            filepath: filepath,
+        }
+    }
+    pub fn contains(&self, key: impl Into<String>) -> bool {
+        let key_string = key.into();
+        self.tree.as_map().unwrap().contains_key(&key_string.into())
+    }
+    pub fn get(&self, key: impl Into<String>) -> SonicObject {
+        let key_string = key.into();
+        let u8_vec: Vec<u8> = self.tree.as_map().unwrap().get(&key_string.into()).unwrap().clone().as_vecu8().unwrap();
+        //let p: Value = serde_json::from_str(String::from_utf8(self.tree.get(key).unwrap().unwrap().as_ref().to_vec()).unwrap().as_str()).unwrap();
+        //let p: SonicSerdeObject = serde_json::from_str(jsonstring.as_str()).unwrap();
+        ////println!("p is '{:?}'", p);
+        let p: SonicSerdeObject = rmp_serde::decode::from_slice(&u8_vec).unwrap();
+        SonicObject::new(p)
+    }
+    pub fn insert(&mut self, key: impl Into<String>, val: impl Into<SonicSerdeObject>) -> () {
+        //let mut sobj = SonicObject::new(value);
+        let value = val.into();
+        let key_string = key.into();
+        let new_vec = rmp_serde::encode::to_vec(&value).unwrap();
+        //rmp_serde::encode::to_vec_named(&value.into()); 
+        //self.tree.insert(key.to_string(), &serde_json::to_string(&value.into()).unwrap()).unwrap();
+        self.tree.insert(key_string, SonicSerdeObject::VecU8(new_vec));
+        self.flush();
+        //self.tree.().unwrap();
+    }
+    pub fn flush(&mut self) -> () {
+        if self.filepath.exists() {
+            std::fs::remove_file(self.filepath.clone()).unwrap();
+        }
+        let mut file_obj = std::fs::File::create(self.filepath.clone()).unwrap();
+        file_obj.write_all(&rmp_serde::encode::to_vec(&self.tree).unwrap()).unwrap();
+    }
+}
+
+/*
 impl SonicPersistObject {
     pub fn new(filepath: PathBuf) -> Self {
         let tree = OpenOptions::new().mode(OpenMode::Create).open(&DirectoryConfig{ path: filepath }).unwrap();//sled::open(&filepath).unwrap();
@@ -274,4 +329,4 @@ impl SonicPersistObject {
         self.tree.commit().unwrap();
     }
 }
-
+*/
